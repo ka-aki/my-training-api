@@ -7,7 +7,7 @@ const stringify = require("csv-stringify/lib/sync");
     executablePath:
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     defaultViewport: null,
-    headless: false,
+    headless: true,
   });
   const page = await browser.newPage();
   await page.goto("https://shotworks.jp/sw/list/a_01/mj_13/work?sv=");
@@ -18,17 +18,9 @@ const stringify = require("csv-stringify/lib/sync");
 
   var datas = [];
   for (let i = 0; i < rows.length; i++) {
-    const category = await rows[i].$("li.job");
-    const categoryValue = await category.getProperty("textContent");
-    const categoryJson = await categoryValue.jsonValue();
-
-    const salary = await rows[i].$("li.salary");
-    const salaryValue = await salary.getProperty("textContent");
-    const salaryJson = await salaryValue.jsonValue();
-
-    const workday = await rows[i].$("li.workday");
-    const workdayValue = await workday.getProperty("textContent");
-    const workdayJson = await workdayValue.jsonValue();
+    const categoryJson = await convertElementToJson(rows[i], "li.job");
+    const salaryJson = await convertElementToJson(rows[i], "li.salary");
+    const workdayJson = await convertElementToJson(rows[i], "li.workday");
 
     let data = {
       category: categoryJson,
@@ -39,3 +31,9 @@ const stringify = require("csv-stringify/lib/sync");
   }
   console.log(datas, "datas");
 })();
+
+async function convertElementToJson(listItem, selector) {
+  const el = await listItem.$(selector);
+  const elValue = await el.getProperty("textContent");
+  return await elValue.jsonValue();
+}
