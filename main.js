@@ -7,68 +7,74 @@ const stringify = require("csv-stringify/lib/sync");
     executablePath:
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     defaultViewport: null,
-    headless: true,
+    headless: false,
   });
   const page = await browser.newPage();
-  await page.goto("https://shotworks.jp/sw/list/a_01/mj_13/work?sv=");
-
-  const rows = await page.$$("#list > div.workinfo_wrapper");
-
-  var datas = [];
-  for (let i = 0; i < rows.length; i++) {
-    const categoryJson = await convertElementToJson(
-      rows[i],
-      "div.workinfo_inner > div.job_sum_wrapper > ul > li.job"
-    );
-    const salaryJson = await convertElementToJson(
-      rows[i],
-      "div.workinfo_inner > div.job_sum_wrapper > ul > li.salary"
-    );
-    const workdayJson = await convertElementToJson(
-      rows[i],
-      "div.workinfo_inner > div.job_sum_wrapper > ul > li.workday"
-    );
-    const titleJson = await convertElementToJson(
-      rows[i],
-      "div.catch_copy > div > h2 > a"
-    );
-    const companyJson = await convertElementToJson(
-      rows[i],
-      "div.workinfo_inner > div.com_info > div"
-    );
-
-    let data = {
-      index: i + 1,
-      title: titleJson.trim(),
-      company: companyJson.trim(),
-      category: categoryJson,
-      salary: salaryJson,
-      workday: workdayJson,
-    };
-    datas.push(data);
-  }
-
-  const propertyNames = Object.getOwnPropertyNames(datas[0]);
-  const columns = {};
-  for (let name of propertyNames) {
-    columns[name] = name;
-  }
-
-  const csvString = stringify(datas, {
-    header: true,
-    columns,
-    quoted_string: true,
+  await page.goto("https://shotworks.jp/sw/list/a_01/mj_13/work?sv=", {
+    waitUntil: "networkidle0",
   });
-  try {
-    fs.writeFileSync("./main.csv", csvString);
-    console.log("🎉 output complete!");
-  } catch (error) {
-    console.log("エラー：", error);
-  }
+
+  const results = await getResults(30, page);
+  debugger;
+  console.log(results, "results");
 })();
 
-const convertElementToJson = async (listItem, selector) => {
-  const el = await listItem.$(selector);
-  const value = await el.getProperty("textContent");
-  return await value.jsonValue();
+const getResults = async (number, page) => {
+  let results = [];
+  do {
+    let new_results = await parseResults(page);
+
+    results = [...results, ...new_results];
+
+    //numberがちょうど30件あったら、次へボタンを押す必要はないため
+    if (results.length < number) {
+      let nextPageButton = await page.$("#mainColumn > div.next_page > a");
+
+      if (nextPageButton) {
+        await nextPageButton.click();
+        await page.waitForNavigation({ waitUntil: "networkidle0" });
+      } else {
+        break;
+      }
+    }
+  } while (results.length < number);
+
+  return results.slice(0, number);
+};
+
+const parseResults = async (page) => {
+  let results = [];
+  const elements = await page.$$("#list > div.workinfo_wrapper");
+
+  for (let element of elements) {
+    let workday = await element.$eval(
+      "div.workinfo_inner > div.job_sum_wrapper > ul > li.workday",
+      (node) => node.innerText.trim()
+    );
+    let job = await element.$eval(
+      "div.workinfo_inner > div.job_sum_wrapper > ul > li.job",
+      (node) => node.innerText.trim()
+    );
+    let salary = await element.$eval(
+      "div.workinfo_inner > div.job_sum_wrapper > ul > li.salary",
+      (node) => node.innerText.trim()
+    );
+    let title = await element.$eval("div.catch_copy > div > h2 > a", (node) =>
+      node.innerText.trim()
+    );
+    let company = await element.$eval(
+      "div.workinfo_inner > div.com_info > div",
+      (node) => node.innerText.trim()
+    );
+
+    results.push({
+      workday,
+      job,
+      salary,
+      title,
+      company,
+    });
+  }
+
+  return results;
 };
