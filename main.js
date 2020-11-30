@@ -14,33 +14,61 @@ const stringify = require("csv-stringify/lib/sync");
     waitUntil: "networkidle0",
   });
 
-  const results = await getResults(30, page);
-  debugger;
-  console.log(results, "results");
+  const results = await getResults(page);
+
+  const datas = results.map((result) => {
+    let re = /^(\d{1,2}\/\d{1,2})～【(\d{1,2}:\d{1,2})～(\d{1,2}:\d{1,2})/;
+    const matched = re.exec(result.workday);
+    let companyRE = /[^\s]+/;
+
+    if (matched === null) return result;
+    return {
+      title: result.title,
+      job: result.job,
+      salary: result.salary,
+      company: companyRE.exec(result.company)[0],
+      workday: result.workday,
+      date: matched[1],
+      startTime: matched[2],
+      endTime: matched[3],
+    };
+  });
+
+  const propertyNames = Object.getOwnPropertyNames(datas[0]);
+  const columns = {};
+
+  for (let name of propertyNames) {
+    columns[name] = name;
+  }
+
+  const csvString = stringify(datas, {
+    header: true,
+    columns,
+    quoted_string: true,
+  });
+  try {
+    fs.writeFileSync("./main.csv", csvString);
+    console.log("🎉 output complete!");
+  } catch (error) {
+    console.log("エラー：", error);
+  }
+  await browser.close();
 })();
 
-const getResults = async (number, page) => {
-  let results = [];
-  do {
-    let new_results = await parseResults(page);
-
-    results = [...results, ...new_results];
-
-    //numberがちょうど30件あったら、次へボタンを押す必要はないため
-    if (results.length < number) {
-      let nextPageButton = await page.$("#mainColumn > div.next_page > a");
-
-      if (nextPageButton) {
-        await nextPageButton.click();
-        await page.waitForNavigation({ waitUntil: "networkidle0" });
-      } else {
-        break;
-      }
-    }
-  } while (results.length < number);
-
-  return results.slice(0, number);
+const getResults = async (page) => {
+  return await getPageContent(page, []);
 };
+
+async function getPageContent(page, results) {
+  const newResults = await parseResults(page);
+  const nextPageButton = await page.$("#mainColumn > div.next_page > a");
+  if (!nextPageButton) {
+    return [...results, ...newResults];
+  }
+  await nextPageButton.click();
+  await page.waitForNavigation({ waitUntil: ["load", "networkidle2"] });
+  return getPageContent(page, [...results, ...newResults]);
+}
 
 const parseResults = async (page) => {
   let results = [];
@@ -68,10 +96,10 @@ const parseResults = async (page) => {
     );
 
     results.push({
-      workday,
+      title,
       job,
       salary,
-      title,
+      workday,
       company,
     });
   }
