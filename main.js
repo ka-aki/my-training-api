@@ -20,17 +20,23 @@ const stringify = require("csv-stringify/lib/sync");
     let re = /^(\d{1,2}\/\d{1,2})～【(\d{1,2}:\d{1,2})～(\d{1,2}:\d{1,2})/;
     const matched = re.exec(result.workday);
     let companyRE = /[^\s]+/;
+    let hourlyWageRE = /^時給(.+)円/;
+    let dailyWageRE = /^日給(.+)円/;
+    const matchedHourly = hourlyWageRE.exec(result.salary);
+    const matchedDaily = dailyWageRE.exec(result.salary);
 
     if (matched === null) return result;
     return {
       title: result.title,
       job: result.job,
-      salary: result.salary,
       company: companyRE.exec(result.company)[0],
       workday: result.workday,
       date: matched[1],
       startTime: matched[2],
       endTime: matched[3],
+      salary: result.salary,
+      hourlyWage: matchedHourly ? Number(matchedHourly[1]) : null,
+      dailyWage: matchedDaily ? Number(matchedDaily[1]) : null,
     };
   });
 
