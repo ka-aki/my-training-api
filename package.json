@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "dependencies": {},
+  "dependencies": {
+    "fluent-ffmpeg": "^2.1.2"
+  },
   "devDependencies": {
     "csv-stringify": "^5.5.3",
     "puppeteer-core": "^5.4.1"
